@@ -180,11 +180,22 @@ tr:nth-child(even):not(.hl) td{background:#f8fafd}
     </div>
     <!-- Mode largeur bât -->
     <div id="f-batiment" style="display:none;margin-top:12px">
-      <div class="field" style="margin-bottom:0">
+      <div class="field">
         <label>Largeur du bâtiment (BC)</label>
         <div class="uw"><input type="number" id="BC_input" inputmode="decimal" placeholder="28.5" step="0.1" oninput="updateRose()"><span>m</span></div>
       </div>
-      <p class="note">Les caps seront calculés depuis les portées et la largeur. Vérifier sur l'écran grue avant pose.</p>
+      <p class="note">Saisis au moins un cap (portée 1 ou 2) ci-dessus — l'autre sera calculé depuis la largeur. Si aucun cap n'est saisi, utilise le cap de référence ci-dessous.</p>
+      <div class="field" style="margin-bottom:0">
+        <label>Cap de référence — flèche pointée vers le milieu de la façade</label>
+        <div class="cap-row">
+          <div class="uw"><input type="number" id="capRefVal" inputmode="decimal" placeholder="0" step="0.1" min="0" max="180" oninput="updateRose()" value="0"><span>°</span></div>
+          <div class="cap-toggle">
+            <button id="cRefG" onclick="setRefSide('G')">◀ G</button>
+            <button id="cRefD" onclick="setRefSide('D')">D ▶</button>
+            <button id="cRef0" class="on-d" onclick="setRefSide('0')" style="border-left:1px solid var(--border)">0°</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -211,7 +222,7 @@ tr:nth-child(even):not(.hl) td{background:#f8fafd}
     <label>Nombre d'éléments à poser</label>
     <div class="uw"><input type="number" id="nb" inputmode="numeric" placeholder="15" step="1"><span>u</span></div>
   </div>
-  <p class="note" style="margin-bottom:10px">Positions interpolées entre point 1 et point 2. Ex : 15 poteaux = 15 caps sur les 15 axes.</p>
+  <p class="note" style="margin-bottom:10px">Positions interpolées entre point 1 et point 2. Ex : 15 poteaux = caps sur les 15 axes exacts.</p>
 </div>
 
 <div id="pose-larg" style="display:none">
@@ -219,9 +230,13 @@ tr:nth-child(even):not(.hl) td{background:#f8fafd}
     <label>Largeur / entraxe élément</label>
     <div class="uw"><input type="number" id="larg" inputmode="decimal" placeholder="1.0" step="0.01"><span>m</span></div>
   </div>
+  <div class="field">
+    <label>Distance mur 1 → premier élément (offset)</label>
+    <div class="uw"><input type="number" id="offset" inputmode="decimal" placeholder="0" step="0.01" value="0"><span>m</span></div>
+  </div>
   <label class="chk">
     <input type="checkbox" id="autoNb" checked onchange="toggleNb()">
-    Quantité automatique (BC ÷ largeur)
+    Quantité automatique (BC ÷ entraxe)
   </label>
   <div id="nbFieldLarg" style="display:none" class="field">
     <label>Quantité si connue</label>
@@ -278,8 +293,16 @@ let drag={active:false,sx:0,sy:0,vx:0,vy:0};
 let pinch={active:false,d0:0,s0:1};
 
 let poseMode='nb'; // 'nb' ou 'larg'
+let refSide='0'; // côté du cap de référence
 function selType(btn,t){document.querySelectorAll('.ty').forEach(b=>b.classList.remove('on'));btn.classList.add('on');curType=t;}
 function toggleNb(){document.getElementById('nbFieldLarg').style.display=document.getElementById('autoNb').checked?'none':'block';}
+function setRefSide(s){
+  refSide=s;
+  document.getElementById('cRefG').className=s==='G'?'on-g':'';
+  document.getElementById('cRefD').className=s==='D'?'on-d':'';
+  document.getElementById('cRef0').className=s==='0'?'on-d':'';
+  updateRose();
+}
 function setPoseMode(m){
   poseMode=m;
   document.getElementById('mp-nb').classList.toggle('on',m==='nb');
@@ -463,42 +486,67 @@ function calc(){
     BC=BCv;
     const cosA=(AB*AB+AC*AC-BC*BC)/(2*AB*AC);
     if(Math.abs(cosA)>1){alert('Triangle impossible : vérifier les portées et la largeur.');return;}
-    const half=Math.acos(cosA)*180/Math.PI/2;
-    capBd=-half; capCd=half;
+    const BAC=Math.acos(cosA)*180/Math.PI; // angle total entre les deux portées
+
+    // Récupérer les caps saisis (optionnels)
+    const v1=parseFloat(document.getElementById('cap1val').value);
+    const v2=parseFloat(document.getElementById('cap2val').value);
+    const cap1known = !isNaN(v1);
+    const cap2known = !isNaN(v2);
+
+    if(cap1known && cap2known){
+      // Les deux sont saisis : on les utilise directement
+      capBd = signedCap(v1, side1);
+      capCd = signedCap(v2, side2);
+    } else if(cap1known){
+      // On connaît le cap 1 → on déduit le cap 2
+      capBd = signedCap(v1, side1);
+      capCd = capBd + BAC; // cap 2 = cap 1 + angle total
+    } else if(cap2known){
+      // On connaît le cap 2 → on déduit le cap 1
+      capCd = signedCap(v2, side2);
+      capBd = capCd - BAC; // cap 1 = cap 2 - angle total
+    } else {
+      // Aucun cap connu : on utilise le cap de référence (milieu façade)
+      const refVal=parseFloat(document.getElementById('capRefVal').value)||0;
+      const refCapSigned = refSide==='G' ? -refVal : refSide==='D' ? refVal : 0;
+      capBd = refCapSigned - BAC/2;
+      capCd = refCapSigned + BAC/2;
+    }
   }
 
-  let nb;
   const B=cxy(capBd,AB),C=cxy(capCd,AC);
   const pts=[{label:'Point 1 — début',d:0,portee:AB,cap:capBd,end:true}];
-  let nb, larg=0;
+  let nbElem=0, largElem=0;
 
   if(poseMode==='nb'){
     // Mode quantité : interpolation égale entre point 1 et point 2
-    nb=parseInt(document.getElementById('nb').value);
-    if(isNaN(nb)||nb<1){alert('Saisis le nombre d\'éléments.');return;}
-    for(let i=0;i<nb;i++){
-      const t = nb===1 ? 0.5 : i/(nb-1);
+    nbElem=parseInt(document.getElementById('nb').value);
+    if(isNaN(nbElem)||nbElem<1){alert('Saisis le nombre d\'éléments.');return;}
+    for(let i=0;i<nbElem;i++){
+      const t = nbElem===1 ? 0.5 : i/(nbElem-1);
       const px=B[0]+t*(C[0]-B[0]),py=B[1]+t*(C[1]-B[1]);
       pts.push({label:`${curType} ${i+1}`,d:t*BC,portee:Math.sqrt(px*px+py*py),cap:cfxy(px,py),end:false});
     }
   } else {
     // Mode largeur : centre de chaque élément
-    larg=parseFloat(document.getElementById('larg').value);
-    if(isNaN(larg)||larg===0){alert('Saisis la largeur élément.');return;}
+    largElem=parseFloat(document.getElementById('larg').value);
+    if(isNaN(largElem)||largElem===0){alert('Saisis la largeur élément.');return;}
     const autoNb=document.getElementById('autoNb').checked;
-    if(autoNb){nb=Math.floor(BC/larg);}
-    else{nb=parseInt(document.getElementById('nb2').value);if(isNaN(nb)||nb===0){alert('Saisis la quantité.');return;}}
-    for(let i=1;i<=nb;i++){
-      const dc=(i-0.5)*larg;
-      if(dc>BC)break;
+    const offsetVal=parseFloat(document.getElementById('offset').value)||0; if(autoNb){nbElem=Math.floor((BC-offsetVal)/largElem)+1;}
+    else{nbElem=parseInt(document.getElementById('nb2').value);if(isNaN(nbElem)||nbElem===0){alert('Saisis la quantité.');return;}}
+    const offset=parseFloat(document.getElementById('offset').value)||0;
+    for(let i=0;i<nbElem;i++){
+      const dc=offset + i*largElem;
+      if(dc>=BC) break;
       const t=dc/BC;
       const px=B[0]+t*(C[0]-B[0]),py=B[1]+t*(C[1]-B[1]);
-      pts.push({label:`${curType} ${i}`,d:dc,portee:Math.sqrt(px*px+py*py),cap:cfxy(px,py),end:false});
+      pts.push({label:`${curType} ${i+1}`,d:dc,portee:Math.sqrt(px*px+py*py),cap:cfxy(px,py),end:false});
     }
   }
 
   pts.push({label:'Point 2 — fin',d:BC,portee:AC,cap:capCd,end:true});
-  const r={AB,AC,capBd,capCd,larg,nb,nom,BC,pts,type:curType,mode:curMode,poseMode,date:new Date().toLocaleString('fr-FR')};
+  const r={AB,AC,capBd,capCd,larg:largElem,nb:nbElem,nom,BC,pts,type:curType,mode:curMode,poseMode,date:new Date().toLocaleString('fr-FR')};
   lastR=r;
   hist.unshift(r);if(hist.length>20)hist.pop();
   localStorage.setItem('gh',JSON.stringify(hist));
