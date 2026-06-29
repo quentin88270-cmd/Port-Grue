@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -117,6 +118,7 @@ tr:nth-child(even):not(.hl) td{background:#f8fafd}
 </div>
 
 <!-- CALCUL -->
+
 <div class="pg active" id="pg-calc">
 
   <div class="ref-box">
@@ -126,17 +128,20 @@ tr:nth-child(even):not(.hl) td{background:#f8fafd}
   </div>
 
   <!-- Rose mini temps réel -->
+
   <div id="rose-wrap">
     <canvas id="rose" height="160" style="width:100%;display:block"></canvas>
   </div>
 
   <!-- Mode -->
+
   <div class="mode-tabs">
     <button class="mode-tab on" id="mt-caps" onclick="setMode('caps')">Je connais les caps</button>
     <button class="mode-tab" id="mt-larg" onclick="setMode('larg')">Je connais la largeur bât.</button>
   </div>
 
   <!-- PORTÉE 1 -->
+
   <div class="card">
     <div class="ct">📍 Portée 1</div>
     <div class="field">
@@ -156,6 +161,7 @@ tr:nth-child(even):not(.hl) td{background:#f8fafd}
   </div>
 
   <!-- PORTÉE 2 -->
+
   <div class="card">
     <div class="ct">📍 Portée 2</div>
     <div class="field">
@@ -183,41 +189,66 @@ tr:nth-child(even):not(.hl) td{background:#f8fafd}
   </div>
 
   <!-- ÉLÉMENTS -->
+
   <div class="card">
     <div class="ct">🧱 Éléments</div>
     <div class="types">
       <button class="ty on" onclick="selType(this,'Prédalle')">Prédalle</button>
       <button class="ty" onclick="selType(this,'Bac acier')">Bac acier</button>
+      <button class="ty" onclick="selType(this,'Poteau')">Poteau</button>
       <button class="ty" onclick="selType(this,'Calpinage')">Calpinage</button>
       <button class="ty" onclick="selType(this,'Autre')">Autre</button>
     </div>
-    <div class="field">
-      <label>Largeur élément</label>
-      <div class="uw"><input type="number" id="larg" inputmode="decimal" placeholder="1.0" step="0.01"><span>m</span></div>
-    </div>
-    <label class="chk">
-      <input type="checkbox" id="autoNb" checked onchange="toggleNb()">
-      Quantité automatique (BC ÷ largeur)
-    </label>
-    <div id="nbField" style="display:none" class="field">
-      <label>Quantité si connue</label>
-      <div class="uw"><input type="number" id="nb" inputmode="numeric" placeholder="28" step="1"><span>u</span></div>
-    </div>
-    <div class="field" style="margin-bottom:0">
-      <label>Nom / chantier (optionnel)</label>
-      <input type="text" id="nom" placeholder="Bât. A — Niveau 2">
-    </div>
+
+```
+<div class="mode-tabs" style="margin-bottom:12px">
+  <button class="mode-tab on" id="mp-nb" onclick="setPoseMode('nb')">Je connais la quantité</button>
+  <button class="mode-tab" id="mp-larg" onclick="setPoseMode('larg')">Je connais la largeur</button>
+</div>
+
+<div id="pose-nb">
+  <div class="field">
+    <label>Nombre d'éléments à poser</label>
+    <div class="uw"><input type="number" id="nb" inputmode="numeric" placeholder="15" step="1"><span>u</span></div>
+  </div>
+  <p class="note" style="margin-bottom:10px">Positions interpolées entre point 1 et point 2. Ex : 15 poteaux = 15 caps sur les 15 axes.</p>
+</div>
+
+<div id="pose-larg" style="display:none">
+  <div class="field">
+    <label>Largeur / entraxe élément</label>
+    <div class="uw"><input type="number" id="larg" inputmode="decimal" placeholder="1.0" step="0.01"><span>m</span></div>
+  </div>
+  <label class="chk">
+    <input type="checkbox" id="autoNb" checked onchange="toggleNb()">
+    Quantité automatique (BC ÷ largeur)
+  </label>
+  <div id="nbFieldLarg" style="display:none" class="field">
+    <label>Quantité si connue</label>
+    <div class="uw"><input type="number" id="nb2" inputmode="numeric" placeholder="28" step="1"><span>u</span></div>
+  </div>
+</div>
+
+<div class="field" style="margin-bottom:0">
+  <label>Nom / chantier (optionnel)</label>
+  <input type="text" id="nom" placeholder="Bât. A — Niveau 2">
+</div>
+```
+
   </div>
 
-  <button class="btn bp" onclick="calc()">⚡ Calculer</button>
+<button class="btn bp" onclick="calc()">⚡ Calculer</button>
+
 </div>
 
 <!-- RÉSULTAT -->
+
 <div class="pg" id="pg-result">
   <div id="res"><p class="he">Lance un calcul d'abord.</p></div>
 </div>
 
 <!-- SCHÉMA -->
+
 <div class="pg" id="pg-schema">
   <div id="schema-wrap">
     <canvas id="cvs"></canvas>
@@ -231,6 +262,7 @@ tr:nth-child(even):not(.hl) td{background:#f8fafd}
 </div>
 
 <!-- HISTORIQUE -->
+
 <div class="pg" id="pg-histo">
   <div id="histo"></div>
 </div>
@@ -245,8 +277,16 @@ let vp={x:0,y:0,scale:8};
 let drag={active:false,sx:0,sy:0,vx:0,vy:0};
 let pinch={active:false,d0:0,s0:1};
 
+let poseMode='nb'; // 'nb' ou 'larg'
 function selType(btn,t){document.querySelectorAll('.ty').forEach(b=>b.classList.remove('on'));btn.classList.add('on');curType=t;}
-function toggleNb(){document.getElementById('nbField').style.display=document.getElementById('autoNb').checked?'none':'block';}
+function toggleNb(){document.getElementById('nbFieldLarg').style.display=document.getElementById('autoNb').checked?'none':'block';}
+function setPoseMode(m){
+  poseMode=m;
+  document.getElementById('mp-nb').classList.toggle('on',m==='nb');
+  document.getElementById('mp-larg').classList.toggle('on',m==='larg');
+  document.getElementById('pose-nb').style.display=m==='nb'?'block':'none';
+  document.getElementById('pose-larg').style.display=m==='larg'?'block':'none';
+}
 
 function setSide(n,s){
   if(n===1){
@@ -403,8 +443,8 @@ function calc(){
   const nom=document.getElementById('nom').value.trim();
   const autoNb=document.getElementById('autoNb').checked;
 
-  if(isNaN(AB)||AB===0||isNaN(AC)||AC===0||isNaN(larg)||larg===0){
-    alert('Remplis les portées 1, 2 et la largeur élément.');return;
+  if(isNaN(AB)||AB===0||isNaN(AC)||AC===0){
+    alert('Remplis les portées 1 et 2.');return;
   }
 
   let capBd,capCd,BC;
@@ -428,21 +468,37 @@ function calc(){
   }
 
   let nb;
-  if(autoNb){nb=Math.floor(BC/larg);}
-  else{nb=parseInt(document.getElementById('nb').value);if(isNaN(nb)||nb===0){alert('Saisis la quantité.');return;}}
-
   const B=cxy(capBd,AB),C=cxy(capCd,AC);
   const pts=[{label:'Point 1 — début',d:0,portee:AB,cap:capBd,end:true}];
-  for(let i=1;i<=nb;i++){
-    const dc=(i-0.5)*larg;
-    if(dc>BC)break;
-    const t=dc/BC;
-    const px=B[0]+t*(C[0]-B[0]),py=B[1]+t*(C[1]-B[1]);
-    pts.push({label:`${curType} ${i}`,d:dc,portee:Math.sqrt(px*px+py*py),cap:cfxy(px,py),end:false});
-  }
-  pts.push({label:'Point 2 — fin',d:BC,portee:AC,cap:capCd,end:true});
+  let nb, larg=0;
 
-  const r={AB,AC,capBd,capCd,larg,nb,nom,BC,pts,type:curType,mode:curMode,date:new Date().toLocaleString('fr-FR')};
+  if(poseMode==='nb'){
+    // Mode quantité : interpolation égale entre point 1 et point 2
+    nb=parseInt(document.getElementById('nb').value);
+    if(isNaN(nb)||nb<1){alert('Saisis le nombre d\'éléments.');return;}
+    for(let i=0;i<nb;i++){
+      const t = nb===1 ? 0.5 : i/(nb-1);
+      const px=B[0]+t*(C[0]-B[0]),py=B[1]+t*(C[1]-B[1]);
+      pts.push({label:`${curType} ${i+1}`,d:t*BC,portee:Math.sqrt(px*px+py*py),cap:cfxy(px,py),end:false});
+    }
+  } else {
+    // Mode largeur : centre de chaque élément
+    larg=parseFloat(document.getElementById('larg').value);
+    if(isNaN(larg)||larg===0){alert('Saisis la largeur élément.');return;}
+    const autoNb=document.getElementById('autoNb').checked;
+    if(autoNb){nb=Math.floor(BC/larg);}
+    else{nb=parseInt(document.getElementById('nb2').value);if(isNaN(nb)||nb===0){alert('Saisis la quantité.');return;}}
+    for(let i=1;i<=nb;i++){
+      const dc=(i-0.5)*larg;
+      if(dc>BC)break;
+      const t=dc/BC;
+      const px=B[0]+t*(C[0]-B[0]),py=B[1]+t*(C[1]-B[1]);
+      pts.push({label:`${curType} ${i}`,d:dc,portee:Math.sqrt(px*px+py*py),cap:cfxy(px,py),end:false});
+    }
+  }
+
+  pts.push({label:'Point 2 — fin',d:BC,portee:AC,cap:capCd,end:true});
+  const r={AB,AC,capBd,capCd,larg,nb,nom,BC,pts,type:curType,mode:curMode,poseMode,date:new Date().toLocaleString('fr-FR')};
   lastR=r;
   hist.unshift(r);if(hist.length>20)hist.pop();
   localStorage.setItem('gh',JSON.stringify(hist));
@@ -628,6 +684,7 @@ window.addEventListener('resize',()=>{
 document.addEventListener('DOMContentLoaded',updateRose);
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
+
 <div style="text-align:center;padding:18px 0 8px;font-size:11px;color:#aaa;letter-spacing:0.5px">© BERNARD 2026</div>
 </body>
 </html>
